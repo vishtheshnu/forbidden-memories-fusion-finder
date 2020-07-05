@@ -40,6 +40,8 @@ app = gui("Forbidden Memories Fusion Finder", "700x500")
 # add & configure widgets - widgets get a name, to help referencing them later
 #app.addLabel("title", "Fusion Finder")
 
+app.addLabel("Fusion Finder")
+
 row = app.getRow()
 app.addLabelOptionBox("RomFolder", [x[0] for x in os.walk('data') if x[0] != 'data'], row, 0)
 app.addButton("LOAD DATA", loadRom, row, 1)
@@ -54,7 +56,7 @@ app.addLabelOptionBox("Game Window", appTitles)#[str(i)+'. '+gw.getAllTitles()[i
 app.addButton("GET FUSIONS", getScreenshot, "p", 1)
 app.setButtonState("GET FUSIONS", "disabled")
 app.addScrolledTextArea("fusions", "n", 0, 3, 3)
-#app.setScrolledTextAreaWidth("fusions", 720)
+app.setScrolledTextAreaWidth("fusions", 720)
 
 # start the GUI
 app.go()

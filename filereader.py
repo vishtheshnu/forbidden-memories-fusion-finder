@@ -7,8 +7,10 @@ game = None
 mrg = None
 cards = None
 app = None
+nonFusers = None
 
 charList = ['']*256
+gstarNames = ['None', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Pluto', 'Neptune', 'Mercury', 'Sun', 'Moon', 'Venus']
 
 def loadData(dataFolder, myapp):
     global app
@@ -18,7 +20,8 @@ def loadData(dataFolder, myapp):
     global mrg
     mrg = np.fromfile(dataFolder+'\WA_MRG.MRG', dtype=np.dtype('uint8'))
     print('Opened files')
-    app.setMeter("progress", 10)
+    if app != None:
+        app.setMeter("progress", 10)
     
     with open('chartable.tbl') as chars:
         line = chars.readline()
@@ -27,16 +30,20 @@ def loadData(dataFolder, myapp):
             charList[index] = line.split('=')[1][:-1]
             line = chars.readline()
     print('Parsed chartable')
-    app.setMeter("progress", 15)
+    if app != None:
+        app.setMeter("progress", 15)
 
     global cards
     cards = getCardData()
     print('Loaded basic card data')
-    app.setMeter("progress", 30)
+    if app != None:
+        app.setMeter("progress", 30)
 
-    getCardImageData()
+    if app != None:
+        getCardImageData()
     print('Loaded card thumbnails')
-    app.setMeter("progress", 100)
+    if app != None:
+        app.setMeter("progress", 100)
 
 #Full work flow
 def getFusionsFromImage(image):
@@ -51,7 +58,8 @@ def getFusionsFromImage(image):
         newlist = matched[:]
         newlist.pop(card)
         fusionList.append(getFusionChain(matched[card], newlist, [matched[card]]))
-    app.setMeter("progress", 97)
+    if app != None:
+        app.setMeter("progress", 97)
 
     #Evaluate fusion chains and sort to get possible results in order of attack, then # of cards required
     fusions = []
@@ -61,7 +69,8 @@ def getFusionsFromImage(image):
     fusions.sort(key = lambda x : cards[x[0]].attack - len(x[1]))
 
     print('obtained fusions from cards')
-    app.setMeter("progress", 99)
+    if app != None:
+        app.setMeter("progress", 99)
 
     #Format fusion chains and results into presentable format
     fusionDict = {}
@@ -77,7 +86,8 @@ def getFusionsFromImage(image):
         nameDict[cards[result].getTitle()] = [ [cards[i].name for i in chain] for chain in fusionDict[result]]
     #Display and return results
     print(nameDict)
-    app.setMeter("progress", 100)
+    if app != None:
+        app.setMeter("progress", 100)
     return nameDict
 
 def getChar(bt):
@@ -228,7 +238,7 @@ def getCardImageData():
     imgSize = 40*32
     clutSize = 256*2
     for i in range(722):
-        if i % 100 == 0: 
+        if i % 100 == 0 and app != None:
             print('loading thumbnail ',i)
             app.setMeter("progress", 30+i/10)
         pixelStart = addr + i*14336
@@ -269,11 +279,12 @@ def getCardsInImage(img_rgb):
     img_rgb = cv.resize(img_rgb, (320, 240), interpolation = cv.INTER_AREA)
     img_gray = cv.cvtColor(img_rgb, cv.COLOR_BGR2GRAY)
     w, h = cards[0].thumbnail.shape[::-1]
-    app.setMeter("progress", 30)
+    if app != None:
+        app.setMeter("progress", 30)
     for card in cards:
         res = cv.matchTemplate(img_gray, card.thumbnail, cv.TM_CCOEFF_NORMED)
         loc = np.where(res >= 0.8)
-        if card.card_id % 100 == 0: 
+        if card.card_id % 100 == 0 and app != None: 
             print('checked card ', card.card_id)
             app.setMeter("progress", 25+card.card_id/10)
         points = []
@@ -312,9 +323,10 @@ def getFusionsList(hand, fusionList=[]):
                 getFusionsList(cards, newhand, fusionList)
 
 def getFusionChain(mycard, hand, fusionChain=[]):
-    if len(hand) == 0:
+    if len(hand) == 0 or (len(cards[mycard].fusionResults) == 0):
         return [fusionChain]
-    print(mycard, cards[mycard].name,': ' ,[cards[i].name for i in hand])
+    #print(mycard, len(cards), [i for i in hand])
+    #print(mycard, cards[mycard].name,': ' ,[cards[i].name for i in hand])
     fusions = []
     #fusionChain.append(mycard)
     isFusion = False
@@ -352,6 +364,73 @@ def printChain(fusionChain, result):
         print(cards[card].name, end=" + ")
     print(' = ', cards[result].name)
 
+
+def findMaterials(result):
+    for card in cards:
+        if result in card.fusionResults:
+            return (card.card_id, card.fusionMaterials[card.fusionResults.index(result)])
+    return None
+
+def findAllMaterials(result):
+    chain = [[result]]
+    while not all(v is None for v in chain[-1]):
+        materials = [findMaterials(card) for card in chain[-1]]
+        chain.append(materials)
+    return chain
+
+def findBestFusion():
+    '''
+    products = set()
+    for card in cards:
+        for result in card.fusionResults:
+            products.add(result)
+    print(products)
+    global nonFusers
+    nonFusers = []
+    for card in cards:
+        if card.card_id-1 not in products:
+            nonFusers.append(card.card_id-1)
+    print(nonFusers)
+    '''
+    nonFusers = [i for i in range(722)]
+    #Get available fusion chains
+    fusionList = []
+    for card in range(len(nonFusers)):
+        newlist = nonFusers[:]
+        newlist.pop(card)
+        fusionList.append(getFusionChain(nonFusers[card], newlist, [nonFusers[card]]))
+    if app != None:
+        app.setMeter("progress", 97)
+
+    #Evaluate fusion chains and sort to get possible results in order of attack, then # of cards required
+    fusions = []
+    for l1 in fusionList:
+        for chain in l1:
+            fusions.append((evaluateFusion(chain), chain))
+    fusions.sort(key = lambda x : cards[x[0]].attack - len(x[1]))
+
+    print('obtained fusions from cards')
+    if app != None:
+        app.setMeter("progress", 99)
+
+    #Format fusion chains and results into presentable format
+    fusionDict = {}
+    for fusion in fusions:
+        if fusion[0] in fusionDict:
+            if fusion[1] not in fusionDict[fusion[0]]:
+                fusionDict[fusion[0]].append(fusion[1])
+        else:
+            fusionDict[fusion[0]] = [fusion[1]]
+    
+    nameDict = {}
+    for result in fusionDict:
+        nameDict[cards[result].getTitle()] = [ [cards[i].name for i in chain] for chain in fusionDict[result]]
+    #Return results
+    if app != None:
+        app.setMeter("progress", 100)
+    return nameDict
+    
+
 class Card:
 
     def __init__(self):
@@ -379,11 +458,18 @@ class Card:
         return str(self.card_id)+": "+self.name+" ("+str(self.card_type)+")\nA/D: "+str(self.attack)+" | "+str(self.defense)+"\n"+str(self.description)
     
     def getTitle(self):
-        return self.name+' ('+str(self.attack)+' | '+str(self.defense)+')'
+        return self.name+' ('+str(self.attack)+' | '+str(self.defense)+')\t'+gstarNames[self.guardian_star_1]+' | '+gstarNames[self.guardian_star_2]
 
 if __name__ == '__main__':
-    loadData()
-    getFusionsFromImage(cv.imread('screenshot.png'))
+    loadData('data\\reimagined', None)
+    fusionData = findBestFusion()
+    resultText = ""
+    for result in fusionData.keys():
+        resultText += result+":\n"
+        for chain in fusionData[result]:
+            resultText += "\t"+str(chain)
+            resultText += "\n"
+    print(resultText)
 
 '''
 if __name__ == '__main__':
