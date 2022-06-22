@@ -2,5 +2,5 @@ appJar==0.94.0
 PyGetWindow==0.0.8
 opencv-python==4.2.0.34
 PyAutoGUI==0.9.50
-numpy==1.18.5
+numpy==1.22.0
 Pillow==7.1.2
